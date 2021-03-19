@@ -1,5 +1,8 @@
 ---
-title: "Untappd Data Report `r emo::ji('clinking_beer_mugs')`"
+title: "A few beers later... `r emo::ji('clinking_beer_mugs')`"
+params:
+  data_file: ./data/allBeers.csv
+  anonymize: 1
 output:
   html_document:
     theme: paper
@@ -16,25 +19,37 @@ knitr::opts_chunk$set(include = T, echo = F, warning = F, message = F, fig.width
 # Load libraries
 library(tidyverse)
 library(ggthemes)  # colors
-library(ggrepel)  # labelling plots (NOT USED NOW)
 library(cowplot)  # themes
 library(GGally)  # just for pairs plot (manually do?)
 library(DT)  # javascript tables
 library(emo)  # emojis (has to be installed with devtools)
-
-# For anonymity
-fake_users <- c("Anne", "Bob", "Carl")
+library(randomNames)  # for making fake names
 
 # Load data
-all_beers <- data.table::fread("./data.csv") %>%
+all_beers <- data.table::fread(params$data_file) %>%
   dplyr::select(-V1) %>%
   dplyr::group_by(beer.beer_name, brewery.brewery_name, beer.bid) %>%
   dplyr::mutate(beer.rating_score = max(beer.rating_score)) %>%
-  dplyr::ungroup() %>%
-  dplyr::right_join(dplyr::distinct(., user) %>%
-                      dplyr::mutate(id = rank(user))) %>%
-  dplyr::mutate(user = fake_users[id]) %>%
-  dplyr::select(-id)
+  dplyr::ungroup()
+n_users <- length(unique(all_beers$user))
+
+# Anonymizes data if specified
+if (as.numeric(params$anonymize) == 1) {
+  
+  # Maintains 3 original names for consistency otherwise makes random
+  if (n_users == 3) {
+    fake_users <- c("Alice", "Bob", "Carl") 
+  } else {
+    fake_users <- randomNames::randomNames(n = n_users, which.names = "first")
+  }
+  
+  # Scrubs usernames from report
+  all_beers <- all_beers %>%
+    dplyr::right_join(dplyr::distinct(., user) %>%
+                        dplyr::mutate(id = rank(user))) %>%
+    dplyr::mutate(user = fake_users[id]) %>%
+    dplyr::select(-id)
+}
 
 # List of users
 users <- distinct(all_beers, user)$user
@@ -289,33 +304,53 @@ all_beers %>%
 I fit a 10-fold cross-validated random forest to predict each user's ratings. Reported here are the Pearson score of each model as well as estimated importance of each feature in prediction (and the associated standard deviation).
 
 ```{r prediction}
-predictions <- list()
-results <- list()
+predictions <- list()  # store actual predictions
+results <- list()  # store model stats
+
+# Fit a 10-fold CV random forest for each user
 for (i in 1:length(users)) {
+  
+  # Filter to user and relevant columns:
+  # beer id, rating, global, num ratings abv, ibu, style, brewery type, brewery state
   user <- all_beers %>%
     dplyr::filter(user == users[[i]]) %>%
-    dplyr::select(beer.bid, rating_score, beer.beer_abv, beer.beer_ibu, beer.beer_style, beer.rating_score,
-                  brewery.brewery_type, brewery.location.brewery_state,
-                  beer.rating_count)
+    dplyr::select(beer.bid, rating_score, beer.beer_abv, beer.beer_ibu,
+                  beer.beer_style, beer.rating_score, brewery.brewery_type,
+                  brewery.location.brewery_state, beer.rating_count)
+  
+  # Make CV folds
   folds <- caret::createFolds(user$rating_score, k = 10)
+  
   preds <- user$rating_score
   importances <- list()
+  
+  # Loop through folds for CV
   for (k in 1:length(folds)) {
+    
+    # Test and training sets
     fold <- folds[[k]]
     test <- user[fold, ]
     train <- dplyr::anti_join(user, test)
+    
+    # Fit RF
     res <- ranger::ranger(rating_score ~ ., data = train %>%
                             dplyr::select(-beer.bid),
                           importance = "impurity", respect.unordered.factors = T)
+    
+    # Store model statistics and predictions
     preds[fold] <- predict(res, test %>% dplyr::select(-rating_score, -beer.bid))$predictions
     imps <- tibble::tibble(feature = names(res$variable.importance),
                            RF.imp = res$variable.importance / sum(res$variable.importance),
                            fold = k)
     importances[[k]] <- imps
   }
+  
+  # Combine across folds
   importances <- dplyr::bind_rows(importances) %>%
     dplyr::distinct(feature, RF.imp, fold) %>%
     reshape2::acast(feature ~ fold, value.var = "RF.imp")
+  
+  # Feature importances
   imp_table <- tibble::tibble(feature = rownames(importances),
                               imp.mean = importances %>%
                                 apply(1, function(x) mean(x, na.rm = T)),
@@ -327,17 +362,25 @@ for (i in 1:length(users)) {
     dplyr::arrange(desc(imp.mean)) %>%
     dplyr::mutate(rank = 1:n()) %>%
     dplyr::mutate(pearson = cor(preds, user$rating_score), user = users[[i]])
+  
+  # Output to final list
   results[[i]] <- imp_table
   predictions[[i]] <- tibble(predicted = preds, actual = user$rating_score,
                              bid = user$beer.bid, user = users[[i]])
 }
+
+# Combine across users
 results <- dplyr::bind_rows(results); predictions <- dplyr::bind_rows(predictions)
+
+# Pearson scores plot
 p1 <- results %>%
   dplyr::distinct(user, pearson) %>%
   ggplot(aes(x = user, y = pearson, fill = user)) +
   geom_bar(stat = "identity") +
   scale_fill_tableau() + theme(legend.position = "none") +
   labs(x = "User", y = "Pearson score")
+
+# Feature importance plot
 p2 <- results %>%
   dplyr::distinct(user, feature, imp.mean, rank) %>%
   ggplot(aes(x = imp.mean, y = fct_reorder(feature, rank, "median", .desc = T), fill = user)) +
@@ -348,6 +391,7 @@ cowplot::plot_grid(p1, p2, rel_widths = c(1, 3))
 ```
 
 ```{r prediction table}
+# Table of random forest results
 DT::datatable(results %>%
                 dplyr::arrange(rank) %>%
                 dplyr::select(c(7, 6, 1, 2, 3)),

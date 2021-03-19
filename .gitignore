@@ -1,6 +1,7 @@
 # special to this repo...
 *.csv
 *.json
+data
 
 # Mac
 .DS_Store
