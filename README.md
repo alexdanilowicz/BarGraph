@@ -17,7 +17,7 @@ echo "CLIENT_SECRET=456" >> .env
 
 Apply for an [Untappd API key](https://untappd.com/api/docs)s.
 
-You'll also want to put USERNAMES in thw `.env` file as a list, like so:
+You'll also want to put USERNAMES in the `.env` file as a list, like so:
 
 ```
 echo "USERNAMES=alexdannylow,andrewbogo" >> .env
