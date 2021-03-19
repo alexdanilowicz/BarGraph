@@ -4,30 +4,30 @@
 
 ## Deploying
 
-The output index.html file is deployed via [surge](https://surge.sh/) to [http://untappd-report.surge.sh/](http://untappd-report.surge.sh/)
+The output index.html file in the `site` directory is deployed via [surge](https://surge.sh/) to [http://untappd-report.surge.sh/](http://untappd-report.surge.sh/)
 
 ## Local Development
 
-We use a simple Python script to hit the Untappd API and R to make graphs and run stats.
+We use a simple Python script to hit the Untappd API. We use R to make graphs and run stats.
 
 ### Getting Untappd API Secrets
 
-To run the Python script, you'll need an Untappd `CLIENT_ID` and `CLIENT_SECRET`. Put those in `,`.env` file in root, like so:
+To run the Python script, you'll need an Untappd `CLIENT_ID` and `CLIENT_SECRET`. Put those in the `.env` file in the root of project, like so:
 
 ```
 echo "CLIENT_ID=123" >> .env
 echo "CLIENT_SECRET=456" >> .env
 ```
 
-You can apply for an [Untappd API key](https://untappd.com/api/docs). The Python script will read the `.env` file.
+Apply for an [Untappd API key](https://untappd.com/api/docs)s.
 
-You'll also want to put USERNAMES in your .env as a list, like so:
+You'll also want to put USERNAMES in thw `.env` file as a list, like so:
 
 ```
-echo "USERNAMES=bob,alice,carl" >> .env
+echo "USERNAMES=alexdannylow,andrewbogo" >> .env
 ```
 
-### Python
+### Running the Python Script
 
 #### First time?
 

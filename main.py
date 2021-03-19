@@ -41,7 +41,9 @@ def get_arguments():
   parser.add_argument("--outfile", type=str, default="data.csv",
                       help="Name of outfile. Should match filename in R script.")
 
-  # TODO: this wrongly assumes all users have checked in roughly the same number of beers
+  # NOTE: this wrongly assumes all users have checked in 
+  # roughly the same number of beers. Perhaps it's more approriate
+  # to pass a list of key value pairs
   parser.add_argument("--number-of-unique-beers", type=int, default=49,
                       help="How many unique beers for each user?")
 
@@ -72,7 +74,6 @@ def request_user_beers(user, blob):
           }
         }
 
-      print(response)
       print("Fetched response with offset: " + str(offset) + " 🍺...")
       construct_user_json(blob, response)
 
@@ -94,5 +95,3 @@ def read_blob_into_df(blob, user):
 if __name__ == "__main__":
   args = get_arguments()
   main()
-
-
