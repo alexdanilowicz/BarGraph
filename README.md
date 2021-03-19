@@ -1,6 +1,6 @@
 # BarGraph 🍻
 
-> Get your user data with the Untappd API and run fancy stats on it
+> Get your user data with the Untappd API and run fancy stats on it.
 
 ## Local Development
 
@@ -82,4 +82,4 @@ TODO
 
 ## Deploying
 
-In our case, the output index.html file in the `site` directory is deployed via [surge](https://surge.sh/) to [http://untappd-report.surge.sh/](http://untappd-report.surge.sh/)
+In our case, the output index.html file in the `site` directory is deployed via [surge](https://surge.sh/) to [http://a-few-beers-later.surge.sh/](http://a-few-beers-later.surge.sh/)
