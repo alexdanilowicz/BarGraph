@@ -26,7 +26,7 @@ library(emo)  # emojis (has to be installed with devtools)
 fake_users <- c("Anne", "Bob", "Carl")
 
 # Load data
-all_beers <- data.table::fread("./allBeers.csv") %>%
+all_beers <- data.table::fread("./data.csv") %>%
   dplyr::select(-V1) %>%
   dplyr::group_by(beer.beer_name, brewery.brewery_name, beer.bid) %>%
   dplyr::mutate(beer.rating_score = max(beer.rating_score)) %>%
