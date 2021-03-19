@@ -1,3 +1,7 @@
+# special to this repo...
+*.csv
+*.json
+
 # Mac
 .DS_Store
 

@@ -55,7 +55,7 @@ def request_user_beers(user, blob):
     for offset in range(0, args.number_of_unique_beers, UNTAPPD_MAX_LIMT):
       params = DEFAULT_PARAMS
       if offset > 1:
-        params = {**DEFAULT_PARAMS, 'offset': str(o)}
+        params = {**DEFAULT_PARAMS, 'offset': str(offset)}
       
       if args.force: 
         r = requests.get(url, params = params)
@@ -74,7 +74,7 @@ def request_user_beers(user, blob):
           }
         }
 
-      print("Fetched response with offset: " + str(offset) + " 🍺...")
+      print("Fetched response with offset: " + str(offset) + " for " + user + " 🍺...")
       construct_user_json(blob, response)
 
 def construct_user_json(blob, response):
