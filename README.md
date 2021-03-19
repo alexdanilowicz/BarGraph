@@ -2,10 +2,6 @@
 
 > Get your user data with the Untappd API and run fancy stats on it
 
-## Deploying
-
-The output index.html file in the `site` directory is deployed via [surge](https://surge.sh/) to [http://untappd-report.surge.sh/](http://untappd-report.surge.sh/)
-
 ## Local Development
 
 We use a simple Python script to hit the Untappd API. We use R to make graphs and run stats.
@@ -71,3 +67,8 @@ python3 main.py --force --outfile "allBeers.csv" --number-of-unique-beers 49
 ### R
 
 TODO
+
+## Deploying
+
+In our case, the output index.html file in the `site` directory is deployed via [surge](https://surge.sh/) to [http://untappd-report.surge.sh/](http://untappd-report.surge.sh/)
+
