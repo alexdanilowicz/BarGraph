@@ -74,7 +74,7 @@ Example usage:
 python3 main.py --force --outfile "allBeers.csv" --number-of-unique-beers 49
 ```
 
-Note that we ignore `.csv` in our `.gitignore`.
+Note that we ignore `.csv` via our `.gitignore`.
 
 ### R
 
