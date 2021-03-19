@@ -19,6 +19,8 @@ Apply for an [Untappd API key](https://untappd.com/api/docs)s.
 
 You'll also want to put USERNAMES in the `.env` file as a list, like so:
 
+The users cannot be private on Untappd.
+
 ```
 echo "USERNAMES=alexdannylow,andrewbogo" >> .env
 ```
@@ -64,6 +66,8 @@ Example usage:
 python3 main.py --force --outfile "allBeers.csv" --number-of-unique-beers 49
 ```
 
+Note that we ignore `.csv` in our `.gitignore`.
+
 ### R
 
 TODO
@@ -71,4 +75,3 @@ TODO
 ## Deploying
 
 In our case, the output index.html file in the `site` directory is deployed via [surge](https://surge.sh/) to [http://untappd-report.surge.sh/](http://untappd-report.surge.sh/)
-
