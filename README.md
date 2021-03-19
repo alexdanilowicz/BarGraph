@@ -15,17 +15,25 @@ echo "CLIENT_ID=123" >> .env
 echo "CLIENT_SECRET=456" >> .env
 ```
 
-Apply for an [Untappd API key](https://untappd.com/api/docs)s.
+You'll need to apply for an [Untappd API key](https://untappd.com/api/docs).
 
-You'll also want to put USERNAMES in the `.env` file as a list, like so:
-
-The users cannot be private on Untappd.
+You'll also need to put USERNAMES in the `.env` file as a list, like so:
 
 ```
 echo "USERNAMES=alexdannylow,andrewbogo" >> .env
 ```
 
+The users cannot be private on Untappd.
+
+For a single username, you can exclude the comma:
+
+```
+"USERNAMES=alexdannylow"
+```
+
 ### Running the Python Script
+
+To create the outfile.csv, you'll need to run the Python script to hit the Untappd API.
 
 #### First time?
 
