@@ -1,0 +1,359 @@
+---
+title: "Untappd Data Report `r emo::ji('clinking_beer_mugs')`"
+output:
+  html_document:
+    theme: paper
+    highlight: kate
+    toc: false
+    includes:
+      in_header: googleAnalytics.html
+---
+
+```{r setup, include=FALSE}
+# Include and silence all chunks
+knitr::opts_chunk$set(include = T, echo = F, warning = F, message = F, fig.width = 12)
+
+# Load libraries
+library(tidyverse)
+library(ggthemes)  # colors
+library(ggrepel)  # labelling plots (NOT USED NOW)
+library(cowplot)  # themes
+library(GGally)  # just for pairs plot (manually do?)
+library(DT)  # javascript tables
+library(emo)  # emojis (has to be installed with devtools)
+
+# For anonymity
+fake_users <- c("Anne", "Bob", "Carl")
+
+# Load data
+all_beers <- data.table::fread("./allBeers.csv") %>%
+  dplyr::select(-V1) %>%
+  dplyr::group_by(beer.beer_name, brewery.brewery_name, beer.bid) %>%
+  dplyr::mutate(beer.rating_score = max(beer.rating_score)) %>%
+  dplyr::ungroup() %>%
+  dplyr::right_join(dplyr::distinct(., user) %>%
+                      dplyr::mutate(id = rank(user))) %>%
+  dplyr::mutate(user = fake_users[id]) %>%
+  dplyr::select(-id)
+
+# List of users
+users <- distinct(all_beers, user)$user
+
+# Set plot theme to "cowplot"
+theme_set(theme_cowplot())
+```
+**Note:** data is limited to beers that at least one of us has checked in as of 3/14/2021.
+
+# How do our distributions stack up? `r emo::ji('bar_chart')` {.tabset .tabset-pills}
+
+## Distributions
+
+```{r distributions}
+# Violin plot with boxplot inside
+all_beers %>%
+  ggplot(aes(x = user, y = rating_score, fill = user)) +
+  geom_violin() +
+  geom_boxplot(width = 0.2, outlier.alpha = 0) +
+  scale_fill_tableau() + ylim(c(0, 5)) +
+  labs(x = "User", y = "Rating")
+```
+
+## Do we agree on ratings?
+
+```{r correlations, fig.height=8}
+# Pairs plot
+all_beers %>%
+  dplyr::select(user, beer.beer_name, brewery.brewery_name, rating_score, beer.rating_score) %>%
+  dplyr::mutate(beer.rating_score = ifelse(beer.rating_score == 0, NA, beer.rating_score)) %>%
+  tidyr::pivot_wider(names_from = "user", values_from = "rating_score") %>%  # make wide table for ggpairs
+  dplyr::rename(global = beer.rating_score) %>%
+  GGally::ggpairs(columns = c(3:ncol(.)))
+```
+
+## Controversial beers
+
+```{r controversial}
+# Find beers with largest difference between our ratings
+controversial <- all_beers %>%
+  dplyr::select(beer.beer_name, brewery.brewery_name, user, rating_score, beer.rating_score) %>%
+  dplyr::group_by(beer.beer_name, brewery.brewery_name) %>%
+  dplyr::mutate(max_diff = max(rating_score) - min(rating_score)) %>%
+  dplyr::ungroup() %>%
+  tidyr::pivot_wider(names_from = "user", values_from = "rating_score") %>%
+  dplyr::filter(max_diff >= 1)
+
+# Make into interactive table
+DT::datatable(controversial %>% dplyr::arrange(desc(max_diff)), style="bootstrap", width="100%",
+              options = list(lengthChange = FALSE, scrollY = "300px", paging = FALSE),
+              colnames = c("Beer", "Brewery", "Rating", "Maximum difference", colnames(controversial)[5:ncol(controversial)]),
+              filter = "top") %>%
+  DT::formatRound(columns = c("beer.rating_score", "max_diff"), digits = 3)
+```
+
+## Differences from global
+
+```{r global diffs}
+# Difference from global average (boxplot)
+all_beers %>%
+  dplyr::filter(beer.rating_score != 0) %>%
+  dplyr::select(user, beer.beer_name, brewery.brewery_name, rating_score, beer.rating_score) %>%
+  dplyr::mutate(glob_diff = rating_score - beer.rating_score) %>%  # calculate difference
+  ggplot(aes(x = user, y = glob_diff)) +
+  geom_boxplot(outlier.alpha = 0) + geom_jitter(aes(color = user)) +
+  scale_color_tableau() +
+  labs(x = "User", y = "Rating difference")
+```
+
+# Breweries `r emo::ji('factory')` {.tabset .tabset-pills}
+
+Ratings by brewery for each user. User must have had 5 or more unique beers from the brewery.
+
+## Top rated
+
+```{r breweries, fig.height=12}
+# Our ratings higher than 4.5
+p1 <- all_beers %>%
+  dplyr::filter(rating_score >= 4.5) %>%
+  dplyr::group_by(brewery.brewery_name) %>%
+  dplyr::mutate(n = n()) %>%
+  ggplot(aes(y = reorder(brewery.brewery_name, n), fill = user)) +
+  geom_bar() + scale_fill_tableau() +
+  labs(x = "Number rated higher than 4.5", y = "Brewery", fill = "User")
+# Global ratings higher than 4.25
+p2 <- all_beers %>%
+  dplyr::filter(beer.rating_score >= 4.25) %>%
+  dplyr::distinct(beer.rating_score, brewery.brewery_name) %>%
+  dplyr::group_by(brewery.brewery_name) %>%
+  dplyr::mutate(n = n()) %>%
+  ggplot(aes(y = reorder(brewery.brewery_name, n))) +
+  geom_bar() + scale_fill_tableau() +
+  labs(x = "Number with average global higher than 4.25", y = "Brewery")
+cowplot::plot_grid(p2, p1, ncol = 1, rel_heights = c(6, 10))
+```
+
+## Average ratings {.tabset .tabset-dropdown}
+
+```{r brewery averages}
+# Ratings by brewery
+brewery_ratings <- all_beers %>%
+  dplyr::group_by(user, brewery.brewery_name) %>%
+  dplyr::mutate(n = n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(n >= 5)  # user has had >= 5
+
+# Loop through each  user and make plot
+brewery_plots <- list()  # store plots
+for (i in 1:length(users)) {
+  p <- brewery_ratings %>%
+    dplyr::filter(user == users[i]) %>%  # filter to current user
+    ggplot(aes(x = rating_score, y = fct_reorder(brewery.brewery_name, rating_score, median),
+               color = brewery.location.brewery_state)) +
+    geom_boxplot(outlier.alpha = 0) + geom_jitter() +
+    scale_color_tableau(palette = "Tableau 20") +
+    xlim(c(0, 5)) +
+    labs(x = "Rating", y = "Brewery", color = "State")
+  brewery_plots[[i]] <- p
+}
+```
+
+```{r brewery averages plot, results='asis', fig.height=8}
+# Print all plots in their own subheading
+for (i in 1:length(users)) {
+  cat(sprintf('\n\n### %s {.tabset .tabset-pills}\n\n', users[i], '\n\n'))
+  print(brewery_plots[[i]])
+  cat("\n\n")
+}
+```
+
+## Brewery rating table
+
+```{r brewery table}
+# Table of brewery ratings
+brew_tab <- all_beers %>%
+  dplyr::group_by(user, brewery.brewery_name) %>%
+  dplyr::summarise(med_rating = median(rating_score), mean_rating = mean(rating_score), n = n(), .groups = "drop") %>%
+  dplyr::filter(n >= 5) %>%  # user has  had >= 5
+  dplyr::group_by(user) %>%
+  dplyr::mutate(rank_med = rank(desc(med_rating), ties.method = "min"),
+                rank_mean = rank(desc(mean_rating), ties.method = "min")) %>%  # rank breweries (ties get same value)
+  dplyr::ungroup()
+
+# Make into interactive table
+DT::datatable(brew_tab %>% dplyr::arrange(rank_med), style="bootstrap", width="100%",
+              options = list(lengthChange = FALSE, scrollY = "300px", paging = FALSE),
+              colnames = c("User", "Brewery", "Median", "Mean", "Beers had", "Rank (median)", "Rank (mean)"),
+              filter = "top") %>%
+  DT::formatRound(columns = c("mean_rating", "med_rating"), digits = 3)  #round values
+```
+
+# Styles `r emo::ji('woman_dancing')` {.tabset .tabset-pills}
+
+Ratings by style for each user. Users must have had 5 different beers of that style. **Note:** "meta" style refers to the  first part of the style while substyle refers to the entire style (e.g. _IPA - Imperial/Double_ would have a meta style of _IPA_ and a "substyle" style of _IPA - Imperial/Double_).
+
+## Meta styles plots {.tabset .tabset-dropdown}
+
+Styles broken down by first part of style annotation
+
+```{r meta style}
+# Styles by first word ("meta")
+meta_style_tab <- all_beers %>%
+  dplyr::mutate(meta_style = str_trim(word(beer.beer_style, 1, sep = fixed("-")))) %>%
+  dplyr::group_by(user, meta_style) %>%
+  dplyr::mutate(n = n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(n >= 5)
+
+# Loop through users and make plots
+style_plots <- list()
+for (i in 1:length(users)) {
+  p <- meta_style_tab %>%
+    dplyr::filter(user == users[i]) %>%
+    ggplot(aes(x = rating_score, y = fct_reorder(meta_style, rating_score, median))) +
+    geom_boxplot(outlier.alpha = 0) +
+    geom_jitter() +
+    xlim(c(0, 5)) +
+    labs(x = "Rating", y = "Style")
+  style_plots[[i]] <- p
+}
+```
+
+```{r meta style plot, results='asis', fig.height=8}
+# Print each plot in own subheading
+for (i in 1:length(users)) {
+  cat(sprintf('\n\n### %s {.tabset .tabset-pills}\n\n', users[i], '\n\n'))
+  print(style_plots[[i]])
+  cat("\n\n")
+}
+```
+
+## Meta styles table
+
+```{r meta style table}
+# Ratings by meta style
+meta_table <- meta_style_tab %>%
+  dplyr::group_by(user, meta_style) %>%
+  dplyr::summarise(med_rating = median(rating_score), mean_rating = mean(rating_score), n = n(), .groups = "drop") %>%
+  dplyr::group_by(user) %>%
+  dplyr::mutate(rank_med = rank(desc(med_rating), ties.method = "min"),
+                rank_mean = rank(desc(mean_rating), ties.method = "min")) %>%
+  dplyr::ungroup()
+
+# Make into interactive table
+DT::datatable(meta_table %>% dplyr::arrange(rank_med), style="bootstrap", width="100%",
+              options = list(lengthChange = FALSE, scrollY = "300px", paging = FALSE),
+              colnames = c("User", "Style", "Median", "Mean", "Beers had", "Rank (median)", "Rank (mean)"),
+              filter = "top") %>%
+  DT::formatRound(columns = c("mean_rating", "med_rating"), digits = 3)
+```
+
+## Substyles table
+
+More detailed style information
+
+```{r granular style table}
+# Ratings by granular style
+style_tab <- all_beers %>%
+  dplyr::group_by(user, beer.beer_style) %>%
+  dplyr::summarise(med_rating = median(rating_score), mean_rating = mean(rating_score), n = n(), .groups = "drop") %>%
+  dplyr::filter(n >= 5) %>%
+  dplyr::group_by(user) %>%
+  dplyr::mutate(rank_med = rank(desc(med_rating), ties.method = "min"),
+                rank_mean = rank(desc(mean_rating), ties.method = "min")) %>%
+  dplyr::ungroup()
+
+# Make into interactive table
+DT::datatable(style_tab %>% dplyr::arrange(rank_med), style="bootstrap", width="100%",
+              options = list(lengthChange = FALSE, scrollY = "300px", paging = FALSE),
+              colnames = c("User", "Substyle", "Median", "Mean", "Beers had", "Rank (median)", "Rank (mean)"),
+              filter = "top") %>%
+  DT::formatRound(columns = c("mean_rating", "med_rating"), digits = 3)
+```
+
+# ABV and IBU `r emo::ji('nauseated_face')` {.tabset .tabset-pills}
+
+```{r abv ibu summary, fig.height=10}
+# Pairs plot relating our ratings to ABV and IBU
+all_beers %>%
+  dplyr::select(user, beer.beer_name, brewery.brewery_name, rating_score,
+                beer.beer_abv, beer.beer_ibu, beer.rating_score) %>%
+  dplyr::mutate(beer.rating_score = ifelse(beer.rating_score == 0, NA, beer.rating_score),
+                beer.beer_ibu = ifelse(beer.beer_ibu == 0, NA, beer.beer_ibu),
+                beer.beer_abv = ifelse(beer.beer_abv == 0, NA, beer.beer_abv)) %>%
+  tidyr::pivot_wider(names_from = "user", values_from = "rating_score") %>%
+  dplyr::rename(global = beer.rating_score, ABV = beer.beer_abv, IBU = beer.beer_ibu) %>%
+  GGally::ggpairs(columns = c(3:ncol(.)))
+```
+
+# Prediction `r emo::ji('monocle')`
+
+I fit a 10-fold cross-validated random forest to predict each user's ratings. Reported here are the Pearson score of each model as well as estimated importance of each feature in prediction (and the associated standard deviation).
+
+```{r prediction}
+predictions <- list()
+results <- list()
+for (i in 1:length(users)) {
+  user <- all_beers %>%
+    dplyr::filter(user == users[[i]]) %>%
+    dplyr::select(beer.bid, rating_score, beer.beer_abv, beer.beer_ibu, beer.beer_style, beer.rating_score,
+                  brewery.brewery_type, brewery.location.brewery_state,
+                  beer.rating_count)
+  folds <- caret::createFolds(user$rating_score, k = 10)
+  preds <- user$rating_score
+  importances <- list()
+  for (k in 1:length(folds)) {
+    fold <- folds[[k]]
+    test <- user[fold, ]
+    train <- dplyr::anti_join(user, test)
+    res <- ranger::ranger(rating_score ~ ., data = train %>%
+                            dplyr::select(-beer.bid),
+                          importance = "impurity", respect.unordered.factors = T)
+    preds[fold] <- predict(res, test %>% dplyr::select(-rating_score, -beer.bid))$predictions
+    imps <- tibble::tibble(feature = names(res$variable.importance),
+                           RF.imp = res$variable.importance / sum(res$variable.importance),
+                           fold = k)
+    importances[[k]] <- imps
+  }
+  importances <- dplyr::bind_rows(importances) %>%
+    dplyr::distinct(feature, RF.imp, fold) %>%
+    reshape2::acast(feature ~ fold, value.var = "RF.imp")
+  imp_table <- tibble::tibble(feature = rownames(importances),
+                              imp.mean = importances %>%
+                                apply(1, function(x) mean(x, na.rm = T)),
+                              imp.sd = importances %>%
+                                apply(1, function(x) sd(x, na.rm = T)),
+                              imp.stability = importances %>%
+                                apply(1, function(x) mean(!is.na(x)))) %>%
+    dplyr::filter(feature != "(Intercept)") %>%
+    dplyr::arrange(desc(imp.mean)) %>%
+    dplyr::mutate(rank = 1:n()) %>%
+    dplyr::mutate(pearson = cor(preds, user$rating_score), user = users[[i]])
+  results[[i]] <- imp_table
+  predictions[[i]] <- tibble(predicted = preds, actual = user$rating_score,
+                             bid = user$beer.bid, user = users[[i]])
+}
+results <- dplyr::bind_rows(results); predictions <- dplyr::bind_rows(predictions)
+p1 <- results %>%
+  dplyr::distinct(user, pearson) %>%
+  ggplot(aes(x = user, y = pearson, fill = user)) +
+  geom_bar(stat = "identity") +
+  scale_fill_tableau() + theme(legend.position = "none") +
+  labs(x = "User", y = "Pearson score")
+p2 <- results %>%
+  dplyr::distinct(user, feature, imp.mean, rank) %>%
+  ggplot(aes(x = imp.mean, y = fct_reorder(feature, rank, "median", .desc = T), fill = user)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_tableau() +
+  labs(y = "Feature", x = "Mean feature importance", fill = "User")
+cowplot::plot_grid(p1, p2, rel_widths = c(1, 3))
+```
+
+```{r prediction table}
+DT::datatable(results %>%
+                dplyr::arrange(rank) %>%
+                dplyr::select(c(7, 6, 1, 2, 3)),
+              style="bootstrap", width="100%",
+              options = list(lengthChange = FALSE, scrollY = "300px", paging = FALSE),
+              colnames = c("User", "Pearson Score", "Feature", "Importance", "Importance deviation"),
+              filter = "top") %>%
+  DT::formatRound(columns = c("pearson", "imp.mean", "imp.sd"), digits = 3)
+```
