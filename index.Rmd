@@ -178,6 +178,32 @@ for (i in 1:length(users)) {
 }
 ```
 
+### Everyone
+
+```{r brewery averages everyone, fig.height=18}
+# To find our favorites as a group
+everyone <- all_beers %>%
+  dplyr::mutate(brewery.location.brewery_state = 
+                  ifelse(nchar(brewery.location.brewery_state) == 2,
+                         brewery.location.brewery_state, "Other")) %>%
+  dplyr::group_by(brewery.brewery_name) %>%
+  dplyr::mutate(n = n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(n >= 5)
+
+# Make new palette in tableau scheme of correct size
+n_pal <- colorRampPalette(tableau_color_pal(palette = "Tableau 20")(20))
+pal <- n_pal(length(unique(everyone$brewery.location.brewery_state)))
+
+everyone %>%
+  ggplot(aes(x = rating_score, y = fct_reorder(brewery.brewery_name, rating_score, median),
+             color = brewery.location.brewery_state)) +
+  geom_boxplot(outlier.alpha = 0) + geom_jitter() +
+  scale_color_manual(values = pal) +
+  xlim(c(0, 5)) +
+  labs(x = "Rating", y = "Brewery", color = "State")
+```
+
 ```{r brewery averages plot, results='asis', fig.height=8}
 # Print all plots in their own subheading
 for (i in 1:length(users)) {
@@ -237,6 +263,18 @@ for (i in 1:length(users)) {
     labs(x = "Rating", y = "Style", color = "Global rating")
   style_plots[[i]] <- p
 }
+```
+
+### Everyone
+
+```{r meta style all, fig.height=10}
+meta_style_tab %>%
+  ggplot(aes(x = rating_score, y = fct_reorder(meta_style, rating_score, median),
+             color = beer.rating_score)) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter() + scale_color_distiller(direction = 1, palette = "Blues", guide = "colourbar") +
+  xlim(c(0, 5)) +
+  labs(x = "Rating", y = "Style", color = "Global rating")
 ```
 
 ```{r meta style plot, results='asis', fig.height=8}
