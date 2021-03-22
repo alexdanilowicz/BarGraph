@@ -2,7 +2,7 @@
 
 > Get your user data with the Untappd API and run fancy stats on it.
 
-## Local Development
+## Local Development 📊
 
 We use a simple Python script to hit the Untappd API. We use R to make graphs and run stats.
 
@@ -80,6 +80,10 @@ Note that we ignore `.csv` via our `.gitignore`.
 
 TODO
 
-## Deploying
+## Deploying 🚀
 
 In our case, the output index.html file in the `site` directory is deployed via [surge](https://surge.sh/) to [http://a-few-beers-later.surge.sh/](http://a-few-beers-later.surge.sh/)
+
+```
+surge ./site a-few-beers-later.surge.sh
+```
