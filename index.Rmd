@@ -1,7 +1,7 @@
 ---
 title: "A few beers later... `r emo::ji('clinking_beer_mugs')`"
 params:
-  data_file: ./data/allBeers.csv
+  data_file: ./data/allBeers2.csv
   anonymize: 1
 output:
   html_document:
@@ -18,6 +18,7 @@ knitr::opts_chunk$set(include = T, echo = F, warning = F, message = F, fig.width
 
 # Load libraries
 library(tidyverse)
+library(RColorBrewer)  # colors
 library(ggthemes)  # colors
 library(cowplot)  # themes
 library(GGally)  # just for pairs plot (manually do?)
@@ -30,8 +31,13 @@ all_beers <- data.table::fread(params$data_file) %>%
   dplyr::select(-V1) %>%
   dplyr::group_by(beer.beer_name, brewery.brewery_name, beer.bid) %>%
   dplyr::mutate(beer.rating_score = max(beer.rating_score)) %>%
-  dplyr::ungroup()
+  dplyr::ungroup() %>%
+  dplyr::mutate(beer.rating_score = ifelse(beer.rating_score == 0, NA, beer.rating_score),
+                beer.beer_ibu = ifelse(beer.beer_ibu == 0, NA, beer.beer_ibu),
+                beer.beer_abv = ifelse(beer.beer_abv == 0, NA, beer.beer_abv))
+
 n_users <- length(unique(all_beers$user))
+n_beers <- nrow(all_beers)
 
 # Anonymizes data if specified
 if (as.numeric(params$anonymize) == 1) {
@@ -66,10 +72,10 @@ theme_set(theme_cowplot())
 # Violin plot with boxplot inside
 all_beers %>%
   ggplot(aes(x = user, y = rating_score, fill = user)) +
-  geom_violin() +
+  geom_violin() + 
   geom_boxplot(width = 0.2, outlier.alpha = 0) +
   scale_fill_tableau() + ylim(c(0, 5)) +
-  labs(x = "User", y = "Rating")
+  labs(x = "User", y = "Rating", fill = "User", title = paste("Total beers:", n_beers))
 ```
 
 ## Do we agree on ratings?
@@ -78,7 +84,6 @@ all_beers %>%
 # Pairs plot
 all_beers %>%
   dplyr::select(user, beer.beer_name, brewery.brewery_name, rating_score, beer.rating_score) %>%
-  dplyr::mutate(beer.rating_score = ifelse(beer.rating_score == 0, NA, beer.rating_score)) %>%
   tidyr::pivot_wider(names_from = "user", values_from = "rating_score") %>%  # make wide table for ggpairs
   dplyr::rename(global = beer.rating_score) %>%
   GGally::ggpairs(columns = c(3:ncol(.)))
@@ -115,7 +120,7 @@ all_beers %>%
   ggplot(aes(x = user, y = glob_diff)) +
   geom_boxplot(outlier.alpha = 0) + geom_jitter(aes(color = user)) +
   scale_color_tableau() +
-  labs(x = "User", y = "Rating difference")
+  labs(x = "User", y = "Rating difference", color = "User")
 ```
 
 # Breweries `r emo::ji('factory')` {.tabset .tabset-pills}
@@ -130,6 +135,7 @@ p1 <- all_beers %>%
   dplyr::filter(rating_score >= 4.5) %>%
   dplyr::group_by(brewery.brewery_name) %>%
   dplyr::mutate(n = n()) %>%
+  dplyr::ungroup() %>%
   ggplot(aes(y = reorder(brewery.brewery_name, n), fill = user)) +
   geom_bar() + scale_fill_tableau() +
   labs(x = "Number rated higher than 4.5", y = "Brewery", fill = "User")
@@ -139,9 +145,11 @@ p2 <- all_beers %>%
   dplyr::distinct(beer.rating_score, brewery.brewery_name) %>%
   dplyr::group_by(brewery.brewery_name) %>%
   dplyr::mutate(n = n()) %>%
-  ggplot(aes(y = reorder(brewery.brewery_name, n))) +
-  geom_bar() + scale_fill_tableau() +
-  labs(x = "Number with average global higher than 4.25", y = "Brewery")
+  dplyr::ungroup() %>%
+  dplyr::mutate(rating_bin = fct_rev(cut(beer.rating_score, seq(4, 5, 0.1)))) %>%
+  ggplot(aes(y = reorder(brewery.brewery_name, n), fill = rating_bin)) +
+  geom_bar() + scale_fill_brewer(palette = "Blues", direction = -1) +
+  labs(x = "Number with average global higher than 4.25", y = "Brewery", fill = "Binned rating")
 cowplot::plot_grid(p2, p1, ncol = 1, rel_heights = c(6, 10))
 ```
 
@@ -202,31 +210,31 @@ DT::datatable(brew_tab %>% dplyr::arrange(rank_med), style="bootstrap", width="1
 
 # Styles `r emo::ji('woman_dancing')` {.tabset .tabset-pills}
 
-Ratings by style for each user. Users must have had 5 different beers of that style. **Note:** "meta" style refers to the  first part of the style while substyle refers to the entire style (e.g. _IPA - Imperial/Double_ would have a meta style of _IPA_ and a "substyle" style of _IPA - Imperial/Double_).
+Ratings by style for each user. **Note:** "meta" style refers to the  first part of the style while substyle refers to the entire style (e.g. _IPA - Imperial/Double_ would have a meta style of _IPA_ and a "substyle" style of _IPA - Imperial/Double_).
 
 ## Meta styles plots {.tabset .tabset-dropdown}
 
 Styles broken down by first part of style annotation
 
-```{r meta style}
+```{r meta style, fig.height=8}
 # Styles by first word ("meta")
 meta_style_tab <- all_beers %>%
   dplyr::mutate(meta_style = str_trim(word(beer.beer_style, 1, sep = fixed("-")))) %>%
   dplyr::group_by(user, meta_style) %>%
   dplyr::mutate(n = n()) %>%
-  dplyr::ungroup() %>%
-  dplyr::filter(n >= 5)
+  dplyr::ungroup()
 
 # Loop through users and make plots
 style_plots <- list()
 for (i in 1:length(users)) {
   p <- meta_style_tab %>%
     dplyr::filter(user == users[i]) %>%
-    ggplot(aes(x = rating_score, y = fct_reorder(meta_style, rating_score, median))) +
+    ggplot(aes(x = rating_score, y = fct_reorder(meta_style, rating_score, median),
+               color = beer.rating_score)) +
     geom_boxplot(outlier.alpha = 0) +
-    geom_jitter() +
+    geom_jitter() + scale_color_distiller(direction = 1, palette = "Blues", guide = "colourbar") +
     xlim(c(0, 5)) +
-    labs(x = "Rating", y = "Style")
+    labs(x = "Rating", y = "Style", color = "Global rating")
   style_plots[[i]] <- p
 }
 ```
@@ -269,7 +277,6 @@ More detailed style information
 style_tab <- all_beers %>%
   dplyr::group_by(user, beer.beer_style) %>%
   dplyr::summarise(med_rating = median(rating_score), mean_rating = mean(rating_score), n = n(), .groups = "drop") %>%
-  dplyr::filter(n >= 5) %>%
   dplyr::group_by(user) %>%
   dplyr::mutate(rank_med = rank(desc(med_rating), ties.method = "min"),
                 rank_mean = rank(desc(mean_rating), ties.method = "min")) %>%
@@ -290,9 +297,6 @@ DT::datatable(style_tab %>% dplyr::arrange(rank_med), style="bootstrap", width="
 all_beers %>%
   dplyr::select(user, beer.beer_name, brewery.brewery_name, rating_score,
                 beer.beer_abv, beer.beer_ibu, beer.rating_score) %>%
-  dplyr::mutate(beer.rating_score = ifelse(beer.rating_score == 0, NA, beer.rating_score),
-                beer.beer_ibu = ifelse(beer.beer_ibu == 0, NA, beer.beer_ibu),
-                beer.beer_abv = ifelse(beer.beer_abv == 0, NA, beer.beer_abv)) %>%
   tidyr::pivot_wider(names_from = "user", values_from = "rating_score") %>%
   dplyr::rename(global = beer.rating_score, ABV = beer.beer_abv, IBU = beer.beer_ibu) %>%
   GGally::ggpairs(columns = c(3:ncol(.)))
@@ -316,6 +320,9 @@ for (i in 1:length(users)) {
     dplyr::select(beer.bid, rating_score, beer.beer_abv, beer.beer_ibu,
                   beer.beer_style, beer.rating_score, brewery.brewery_type,
                   brewery.location.brewery_state, beer.rating_count)
+  
+  # Remove NAs
+  user <- user[apply(user, 1, function(x) !any(is.na(x))), ]
   
   # Make CV folds
   folds <- caret::createFolds(user$rating_score, k = 10)
