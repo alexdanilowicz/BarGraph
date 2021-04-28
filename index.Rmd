@@ -8,8 +8,6 @@ output:
     theme: paper
     highlight: kate
     toc: false
-    includes:
-      in_header: googleAnalytics.html
 ---
 
 ```{r setup, include=FALSE}
@@ -18,6 +16,8 @@ knitr::opts_chunk$set(include = T, echo = F, warning = F, message = F, fig.width
 
 # Load libraries
 library(tidyverse)
+library(caret)  # model setup
+library(ranger)  # random forest
 library(RColorBrewer)  # colors
 library(ggthemes)  # colors
 library(cowplot)  # themes
@@ -41,14 +41,14 @@ n_beers <- nrow(all_beers)
 
 # Anonymizes data if specified
 if (as.numeric(params$anonymize) == 1) {
-  
+
   # Maintains 3 original names for consistency otherwise makes random
   if (n_users == 3) {
-    fake_users <- c("Alice", "Bob", "Carl") 
+    fake_users <- c("Alice", "Bob", "Carl")
   } else {
     fake_users <- randomNames::randomNames(n = n_users, which.names = "first")
   }
-  
+
   # Scrubs usernames from report
   all_beers <- all_beers %>%
     dplyr::right_join(dplyr::distinct(., user) %>%
@@ -72,7 +72,7 @@ theme_set(theme_cowplot())
 # Violin plot with boxplot inside
 all_beers %>%
   ggplot(aes(x = user, y = rating_score, fill = user)) +
-  geom_violin() + 
+  geom_violin() +
   geom_boxplot(width = 0.2, outlier.alpha = 0) +
   scale_fill_tableau() + ylim(c(0, 5)) +
   labs(x = "User", y = "Rating", fill = "User", title = paste("Total beers:", n_beers))
@@ -183,7 +183,7 @@ for (i in 1:length(users)) {
 ```{r brewery averages everyone, fig.height=18}
 # To find our favorites as a group
 everyone <- all_beers %>%
-  dplyr::mutate(brewery.location.brewery_state = 
+  dplyr::mutate(brewery.location.brewery_state =
                   ifelse(nchar(brewery.location.brewery_state) == 2,
                          brewery.location.brewery_state, "Other")) %>%
   dplyr::group_by(brewery.brewery_name) %>%
@@ -350,7 +350,7 @@ results <- list()  # store model stats
 
 # Fit a 10-fold CV random forest for each user
 for (i in 1:length(users)) {
-  
+
   # Filter to user and relevant columns:
   # beer id, rating, global, num ratings abv, ibu, style, brewery type, brewery state
   user <- all_beers %>%
@@ -358,29 +358,29 @@ for (i in 1:length(users)) {
     dplyr::select(beer.bid, rating_score, beer.beer_abv, beer.beer_ibu,
                   beer.beer_style, beer.rating_score, brewery.brewery_type,
                   brewery.location.brewery_state, beer.rating_count)
-  
+
   # Remove NAs
   user <- user[apply(user, 1, function(x) !any(is.na(x))), ]
-  
+
   # Make CV folds
   folds <- caret::createFolds(user$rating_score, k = 10)
-  
+
   preds <- user$rating_score
   importances <- list()
-  
+
   # Loop through folds for CV
   for (k in 1:length(folds)) {
-    
+
     # Test and training sets
     fold <- folds[[k]]
     test <- user[fold, ]
     train <- dplyr::anti_join(user, test)
-    
+
     # Fit RF
     res <- ranger::ranger(rating_score ~ ., data = train %>%
                             dplyr::select(-beer.bid),
                           importance = "impurity", respect.unordered.factors = T)
-    
+
     # Store model statistics and predictions
     preds[fold] <- predict(res, test %>% dplyr::select(-rating_score, -beer.bid))$predictions
     imps <- tibble::tibble(feature = names(res$variable.importance),
@@ -388,12 +388,12 @@ for (i in 1:length(users)) {
                            fold = k)
     importances[[k]] <- imps
   }
-  
+
   # Combine across folds
   importances <- dplyr::bind_rows(importances) %>%
     dplyr::distinct(feature, RF.imp, fold) %>%
     reshape2::acast(feature ~ fold, value.var = "RF.imp")
-  
+
   # Feature importances
   imp_table <- tibble::tibble(feature = rownames(importances),
                               imp.mean = importances %>%
@@ -406,7 +406,7 @@ for (i in 1:length(users)) {
     dplyr::arrange(desc(imp.mean)) %>%
     dplyr::mutate(rank = 1:n()) %>%
     dplyr::mutate(pearson = cor(preds, user$rating_score), user = users[[i]])
-  
+
   # Output to final list
   results[[i]] <- imp_table
   predictions[[i]] <- tibble(predicted = preds, actual = user$rating_score,
