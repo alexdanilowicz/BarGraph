@@ -78,7 +78,24 @@ Note that we ignore `.csv` via our `.gitignore`.
 
 ### R
 
-TODO
+#### First time?
+
+Pull the Docker image from Docker Hub:
+
+`docker pull aboghoss/bargraph`
+
+#### Then
+
+```
+docker run -it \
+  -v <DATA_DIRECTORY>:/data \
+  -v <OUTPUT_DIRECTORY>:/out_dir \
+   aboghoss/bargraph \
+   -d /data/<FILENAME> \
+   -o /out_dir
+   -n <OUTFILE_NAME>
+   -a <ANONYMIZE>
+```
 
 ## Deploying 🚀
 
