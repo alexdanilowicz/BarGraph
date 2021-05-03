@@ -10,7 +10,7 @@ LABEL org.label-schema.url="https://a-few-beers-later.surge.sh"
 LABEL org.label-schema.vcs-url="https://github.com/alexdanilowicz/BarGraph"
 LABEL org.label-schema.schema-version="0.0.1"
 
-# Updadte some basic packages for R compatibility
+# Update some basic packages for R compatibility
 
 # Set working directory
 WORKDIR /
