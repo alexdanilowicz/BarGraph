@@ -98,12 +98,19 @@ docker run -it \
    -n <OUTFILE_NAME>
    -a <ANONYMIZE>
 ```
-`-d`: string name of your data file
-`-o`: string name of directory to write to
-`-n`: string name of the report that will be created
-`-a`: `0` to keep usernames, `1` to anonymize data
+Replacing `<DATA_DIRECTORY>` with the path to the local directory containing your Untappd data (e.g. `~/Desktop/beer_data.csv`) and `<OUTPUT_DIRECTORY>` with a path to the directory you would like the report written to.
 
 The `-v` arguments mount directories to the container allowing them to read and write in those directories. If the directory you want to write to is the same as the one containing your data remove line 94 and edit line 97 to be `-o /data`.
+
+##### Arguments
+
+`-d`: string name of your data file
+
+`-o`: string name of directory to write to
+
+`-n`: string name of the report that will be created
+
+`-a`: `0` to keep usernames, `1` to anonymize data
 
 ## Deploying 🚀
 
