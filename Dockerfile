@@ -23,9 +23,9 @@ COPY ./report.sh /bargraph/bin/report.sh
 # Install R packages
 RUN Rscript /install_packages.R
 
-# Make report,sh executable
+# Make report.sh executable
 ENV PATH /bargraph/bin:$PATH
-RUN ["chmod","-R", "+x", "/bargraph/bin"]
+RUN ["chmod", "-R", "+x", "/bargraph/bin"]
 
 # Entrypoint to run container
 ENTRYPOINT ["report.sh"]
