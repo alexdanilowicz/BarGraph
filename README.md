@@ -80,7 +80,9 @@ Note that we ignore `.csv` via our `.gitignore`.
 
 #### First time?
 
-Pull the Docker image from Docker Hub:
+Install [Docker Desktop](https://docs.docker.com/desktop/) for your system. 
+
+Then, pull the Docker image from Docker Hub:
 
 `docker pull aboghoss/bargraph`
 
