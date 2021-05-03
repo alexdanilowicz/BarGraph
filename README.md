@@ -80,7 +80,7 @@ Note that we ignore `.csv` via our `.gitignore`.
 
 #### First time?
 
-Install [Docker Desktop](https://docs.docker.com/desktop/) for your system. 
+Install [Docker Desktop](https://docs.docker.com/desktop/) for your system.
 
 Then, pull the Docker image from Docker Hub:
 
@@ -98,6 +98,12 @@ docker run -it \
    -n <OUTFILE_NAME>
    -a <ANONYMIZE>
 ```
+`-d`: string name of your data file
+`-o`: string name of directory to write to
+`-n`: string name of the report that will be created
+`-a`: `0` to keep usernames, `1` to anonymize data
+
+The `-v` arguments mount directories to the container allowing them to read and write in those directories. If the directory you want to write to is the same as the one containing your data remove line 94 and edit line 97 to be `-o /data`.
 
 ## Deploying 🚀
 
