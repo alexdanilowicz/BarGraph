@@ -1,0 +1,15 @@
+# Virtual environment
+venv
+.env
+
+# Git
+.git
+.gitignore
+
+# Other
+site
+.DS_Store
+.Rhistory
+README.md
+requirements.txt
+site/index.html

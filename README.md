@@ -76,9 +76,41 @@ python3 main.py --force --outfile "allBeers.csv" --number-of-unique-beers 49
 
 Note that we ignore `.csv` via our `.gitignore`.
 
-### R
+### Generating a report with R
 
-TODO
+#### First time?
+
+Install [Docker Desktop](https://docs.docker.com/desktop/) for your system.
+
+Then, pull the Docker image from Docker Hub:
+
+`docker pull aboghoss/bargraph:v0.0.1`
+
+#### Then
+
+```
+docker run -it \
+  -v <DATA_DIRECTORY>:/data \
+  -v <OUTPUT_DIRECTORY>:/out_dir \
+  aboghoss/bargraph:v0.0.1 \
+  -d /data/<FILENAME> \
+  -o /out_dir \
+  -n <OUTFILE_NAME> \
+  -a <ANONYMIZE>
+```
+Replacing `<DATA_DIRECTORY>` with the path to the local directory containing your Untappd data (e.g. `~/Desktop/beer_data.csv`) and `<OUTPUT_DIRECTORY>` with a path to the directory you would like the report written to.
+
+The `-v` arguments mount directories to the container allowing them to read and write in those directories. If the directory you want to write to is the same as the one containing your data remove line 94 and edit line 97 to be `-o /data`.
+
+##### Arguments
+
+`-d`: string name of your data file
+
+`-o`: string name of directory to write to
+
+`-n`: string name of the report that will be created
+
+`-a`: `0` to keep usernames, `1` to anonymize data
 
 ## Deploying 🚀
 
