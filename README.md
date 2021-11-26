@@ -6,13 +6,16 @@
 
 We use a simple Python script to hit the Untappd API. We use R to make graphs and run stats.
 
+## Requirements
+
+Install [Docker Desktop](https://docs.docker.com/desktop/) for your system.
+
 ### Getting Untappd API Secrets
 
 To run the Python script, you'll need an Untappd `CLIENT_ID` and `CLIENT_SECRET`. Put those in the `.env` file in the root of project, like so:
 
 ```
-echo "CLIENT_ID=123" >> .env
-echo "CLIENT_SECRET=456" >> .env
+cd python; echo "CLIENT_ID=123" >> .env; echo "CLIENT_SECRET=456" >> .env
 ```
 
 You'll need to apply for an [Untappd API key](https://untappd.com/api/docs).
@@ -20,7 +23,7 @@ You'll need to apply for an [Untappd API key](https://untappd.com/api/docs).
 You'll also need to put USERNAMES in the `.env` file as a list, like so:
 
 ```
-echo "USERNAMES=alexdannylow,andrewbogo" >> .env
+echo "USERNAMES=alexdannylow,andrewbogo,DylanHong" >> .env
 ```
 
 The users cannot be private on Untappd.
@@ -31,25 +34,17 @@ For a single username, you can exclude the comma:
 "USERNAMES=alexdannylow"
 ```
 
-### Running the Python Script
+### 1) Getting the Data
 
-To create the outfile.csv, you'll need to run the Python script to hit the Untappd API.
+To create the *.csv consumed by the R script, you'll need to run the Python script to hit the Untappd API.
 
-#### First time?
 
-Create virutal env:
+```
+cd python; 
 
-`python3 -m venv venv`
+```
 
-In the future, we would like to dockerize this.
-
-#### Then:
-
-`source venv/bin/activate`
-
-`pip3 install -r requirements.txt`
-
-Once everything is installed, you can run the script.
+### Script usage
 
 ```
 python3 main.py --help
@@ -71,22 +66,17 @@ optional arguments:
 Example usage:
 
 ```
-python3 main.py --force --outfile "allBeers.csv" --number-of-unique-beers 49
+python3 main.py --force
 ```
 
-Note that we ignore `.csv` via our `.gitignore`.
+### 3) Generating a report with R
 
-### Generating a report with R
 
-#### First time?
-
-Install [Docker Desktop](https://docs.docker.com/desktop/) for your system.
-
-Then, pull the Docker image from Docker Hub:
+First, pull the Docker image from Docker Hub:
 
 `docker pull aboghoss/bargraph:v0.0.1`
 
-#### Then
+Secondly:
 
 ```
 docker run -it \
